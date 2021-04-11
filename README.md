@@ -52,7 +52,7 @@ Unit test modules are kept in the `tests`.
 Make sure that you're in the project's root directory (the same one in which the `requirements.txt` resides), and then run,
 
 ```bash
-pip3 install -r requirements.txt
+./build_dependencies.sh
 ```
 
 ## Structure of an ETL Job
