@@ -1,73 +1,101 @@
-# HelloFresh Data Engineering Test
+# Hellofresh Spark Challenge
 
-Thank you for your interest in joining HelloFresh! As part of our selection process, all of our candidates must take the following test.
-The test is designed to assess key competencies required in your role as a data engineer at HelloFresh.
+This project is designed to be read in parallel from local file system in pyspark with code `HelloFresh_Challenge`. This project addresses the following topics:
 
-Please submit your answers in a different branch and create a pull request. Please do not merge your own pull request.
+- Reading JSON data;
+- Transformations against given Data;
+- Load data to output file;
+- Test case to check transformation and extractor;
+#### Just something I want to mention I diagnosed COVID positive on Friday evening but I still managed to complete the test as i promised with recruiter. Due to bad health it took more time to complete the test otherwise I can complete this in 5-6 hours
+### Libraries Used
 
-_Note: While we love open source here at HelloFresh, please do not create a public repo with your test in! This challenge is only shared with people interviewing, and for obvious reasons we'd like it to remain this way._
+- pyspark
+- configparser
+- pytest
 
+### Required Installation on OS
 
-# HelloFresh
-At HelloFresh, our mission is to change the way people eat - forever. From our 2011 founding in Europe’s vibrant tech hub Berlin, we’ve become the global market leader in the meal kit sector and inspire millions of energized home cooks across the globe every week.
-We offer our meal kit boxes full of exciting recipes and thoughtfully sourced, fresh ingredients in more than 13 countries, operating from offices in Berlin, New York City, Sydney, Toronto, London, Amsterdam and Copenhagen and shipped out more than 250 Million meals in 2019.
+- Python 3.7
+- spark 3.1.1
 
-### Data Engineering at HelloFresh
-We ingest events from our Kafka Stream and store them in our DataLake on s3. 
-Events are sorted by arriving date. For example `events/recipe_changes/2019/11/29`.
-During events processing we heavily rely on execution day to make sure we pick proper chunk of data and keep historical results.
-We use Apache Spark to work with data and store it on s3 in parquet format. Our primary programming language is Python.
+## ETL Project Structure
 
-# Exercise
-## Overview
-At HelloFresh we have a big recipes archive that was created over the last 8 years. 
-It is constantly being updated either by adding new recipes or by making changes to existing ones. 
-We have a service that can dump archive in JSON format to selected s3 location. 
-We are interested in tracking changes to see available recipes, their cooking time and difficulty level.
+The basic project structure is as follows:
 
-## Task 1
-Using Apache Spark and Python, read, pre-process and persist rows to ensure optimal structure and performance for further processing.  
-The source events are located on the `input` folder. 
-
-## Task 2
-Using Apache Spark and Python read processed dataset from Task 1 and: 
-1. Extract only recipes that have `beef` as one of the ingredients.
-2. Calculate average cooking time duration per difficulty level.
-3. Persist dataset as CSV to the `output` folder.  
-  The dataset should have 2 columns: `difficulty,avg_total_cooking_time`.
-
-Total cooking time duration can be calculated by formula:
 ```bash
-total_cook_time = cookTime + prepTime
-```  
+root/
+ |-- configs/
+ |   |-- config.ini
+ |-- dependencies/
+ |   |-- extractor.py
+ |   |-- loader.py
+ |   |-- logging.py
+ |   |-- spark.py
+ |   |-- transformer.py
+ |-- jobs/
+ |   |-- etl_job.py
+ |-- tests/
+ |   |-- test_etl_job.py
+ |   build_dependencies.sh
+ |   packages.zip
+ |   requirements.txt
+```
+This project is designed to run ETL using Spark to achieve parallelization.
+The main Python module containing the ETL job (which will be sent to the Spark cluster), is `jobs/etl_job.py`. Any external 
+configuration parameters required by `etl_job.py` are stored in JSON format in `configs/etl_config.json`. Additional modules 
+that support this job can be kept in the `dependencies` folder . In the project's root i include `build_dependencies.sh`, which 
+is a bash script for building these dependencies into a zip-file to be sent to the cluster (`packages.zip`). 
+Unit test modules are kept in the `tests`.
 
-Criteria for levels based on total cook time duration:
-- easy - less than 30 mins
-- medium - between 30 and 60 mins
-- hard - more than 60 mins.
+## Installing this Projects' Dependencies
 
-## Deliverables
-- A deployable Spark Application written in Python.
-- A separate `ETL_README.md` file with a brief explanation of the approach, data exploration and assumptions/considerations. 
-- CSV output dataset from Task 2.
+Make sure that you're in the project's root directory (the same one in which the `requirements.txt` resides), and then run,
 
-## Requirements
-- Well structured, object-oriented, documented and maintainable code.
-- Robust and resilient code. The application should be able to scale if data volume increases.
-- Unit tests for the different components.
-- Proper exception handling.
-- Documentation.
-- Solution is deployable and we can run it (locally and on a cluster) - an iPython notebook is not sufficient.
+```bash
+./build_dependencies.sh
+```
 
-NOTE: If you are using code in your submission that was not written by you, please be sure to attribute it to it's original author.
+## Structure of an ETL Job
 
-## Bonus points
-- Config management.
-- Logging and alerting.
-- Data quality checks (like input/output dataset validation).
-- How would you implement CI/CD for this application?
-- How would you diagnose and tune the application in case of performance problems?
-- How would you schedule this pipeline to run periodically?
-- We appreciate good combination of Software and Data Engineering.
+In order to facilitate easy debugging and testing, i have isolated job in Extract,Load and Transform classes.
 
-Good Luck!
+## Packaging ETL Job Dependencies
+
+In this project i have used different functions that can be used across different ETL jobs are kept in a module called `dependencies` and referenced in specific job modules using, for example,
+
+``` python
+from dependencies.spark import start_spark
+```
+
+To make this task easier, especially when modules such as `dependencies` have additional dependencies (e.g. the `pyspark` package), i have created `build_dependencies.sh` bash script for automating the production of `packages.zip`.
+## Running the ETL job
+
+To run a ETL job first we need to run build_dependencies.sh to clean ETL package.
+` ./build_dependencies.sh `
+`$SPARK_HOME` environment variable points to my local Spark installation folder, then the ETL job can be run from the project's root directory using the following 
+ 
+```bash
+$SPARK_HOME/bin/spark-submit \
+--master local[*],spark://99863b29b2a8:7077 \
+--py-files packages.zip \
+jobs/etl_job.py
+```
+
+
+Briefly, the options supplied serve the following purposes:
+
+- `--master local[*]` - the address of the Spark cluster to start the job on. If you have a Spark cluster in operation (either in single-executor mode locally, or something larger in the cloud) and want to send the job there, then modify this with the appropriate Spark IP - e.g. `spark://the-clusters-ip-address:7077`;
+- `--jars` -  JDBC driver for connecting to a relational database
+- `--py-files packages.zip` - archive containing Python dependencies (modules) referenced by the job; and,
+- `jobs/etl_job.py` - the Python module file containing the ETL job to execute.
+## Automated Testing
+
+In order to test with Spark, i use the `pyspark` Python package, which is bundled with the Spark JARs required to programmatically start-up and tear-down a local Spark instance, on a per-test-suite basis (we recommend using the `setUp` and `tearDown` methods in `unittest.TestCase` to do this once per test-suite). Note, that using `pyspark` to run Spark is an alternative way of developing with Spark as opposed to using the PySpark shell or `spark-submit`.
+I have not defined number of executor and   cores of executors because currently we don't have to much data.
+Given that i have chosen to structure our ETL jobs in such a way as to isolate the 'Load and Extract' steps.
+
+To execute the unit test run,
+
+```bash
+python3 -m unittest tests/test_*.py
+```
